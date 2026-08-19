@@ -9,4 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+#directories
+scripts/
+results/
+
+#files
 .env
+guide.md

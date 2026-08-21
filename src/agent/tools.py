@@ -1,16 +1,22 @@
+import os
 import subprocess
+import tempfile
 
 
-def run_static_analysis(filepath: str) -> str:
+def run_static_analysis(file_content: str) -> str:
     """Runs ruff on a Python file and returns the findings as text."""
-    result = subprocess.run(
-        ["ruff", "check", filepath],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.stdout or "No issues found."
 
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+        tmp.write(file_content)
+        tmp_path = tmp.name
 
-if __name__ == "__main__":
-    run_static_analysis()
+    try:
+        result = subprocess.run(
+            ["ruff", "check", tmp_path],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.stdout or "No issues found."
+    finally:
+        os.remove(tmp_path)

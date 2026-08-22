@@ -85,7 +85,7 @@ def _next_unanalyzed_file(
     state: ReviewState, tool_name: str, extensions: tuple[str, ...]
 ) -> str | None:
     candidates = [f for f in state["changed_files"] if f.endswith(extensions)]
-    prefix = f"{tool_name}"
+    prefix = f"{tool_name}:"
     already_done = {
         entry.removeprefix(prefix)
         for entry in state["files_analyzed"]
@@ -103,13 +103,14 @@ def call_tool(state: ReviewState) -> dict:
 
     if action == "run_static_analysis":
         target_path = _next_unanalyzed_file(state, "run_static_analysis", (".py"))
+        print(f"[DEBUG] run_static_analysis target: {target_path}")
         if target_path is None:
             result = "All Python files already checked with static analysis."
             files_analyzed_update = []
         else:
             content = fetch_file_content(state, target_path)
             if content is not None:
-                result = run_static_analysis(content)
+                result = run_static_analysis(content, display_name=target_path)
             else:
                 result = f"Could not fetch {target_path} for analysis."
             files_analyzed_update = [f"run_static_analysis:{target_path}"]

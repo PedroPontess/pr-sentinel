@@ -14,6 +14,7 @@ class ReviewState(TypedDict):
     changed_files: list[str]
     pr_head_sha: str
     tool_calls_made: Annotated[list[str], operator.add]
+    files_analyzed: Annotated[list[str], operator.add]
     findings: Annotated[list[dict], operator.add]
     iterations: int
     next_action: str
@@ -41,6 +42,7 @@ def fetch_context(state: ReviewState) -> dict:
         "pr_diff": diff_text,
         "changed_files": changed_files,
         "pr_head_sha": pr.head.sha,
+        "files_analyzed": [],
         "iterations": 0,
         "done": False,
     }
@@ -79,6 +81,20 @@ Respond with only the action name."""
     }
 
 
+def _next_unanalyzed_file(
+    state: ReviewState, tool_name: str, extensions: tuple[str, ...]
+) -> str | None:
+    candidates = [f for f in state["changed_files"] if f.endswith(extensions)]
+    prefix = f"{tool_name}"
+    already_done = {
+        entry.removeprefix(prefix)
+        for entry in state["files_analyzed"]
+        if entry.startswith(f"{tool_name}:")
+    }
+    remaining = [f for f in candidates if f not in already_done]
+    return remaining[0] if remaining else None
+
+
 def call_tool(state: ReviewState) -> dict:
     action = state["next_action"]
 
@@ -86,18 +102,20 @@ def call_tool(state: ReviewState) -> dict:
         return {"done": True}
 
     if action == "run_static_analysis":
-        py_files = [f for f in state["changed_files"] if f.endswith(".py")]
-        if not py_files:
-            result = "No Python files changed — nothing for ruff to check."
+        target_path = _next_unanalyzed_file(state, "run_static_analysis", (".py"))
+        if target_path is None:
+            result = "All Python files already checked with static analysis."
+            files_analyzed_update = []
         else:
-            target_path = py_files[0]
             content = fetch_file_content(state, target_path)
             if content is not None:
                 result = run_static_analysis(content)
             else:
-                result = f"Could not fetch {py_files[0]} for analysis."
+                result = f"Could not fetch {target_path} for analysis."
+            files_analyzed_update = [f"run_static_analysis:{target_path}"]
         return {
             "tool_calls_made": [action],
+            "files_analyzed": files_analyzed_update,
             "findings": [{"tool": action, "result": result}],
         }
 

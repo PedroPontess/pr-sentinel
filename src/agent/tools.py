@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 
 
-def run_static_analysis(file_content: str) -> str:
+def run_static_analysis(file_content: str, display_name: str | None = None) -> str:
     """Runs ruff on a Python file and returns the findings as text."""
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
@@ -17,6 +17,9 @@ def run_static_analysis(file_content: str) -> str:
             text=True,
             check=False,
         )
-        return result.stdout or "No issues found."
+        output = result.stdout or "No issues found."
+        if display_name:
+            output = output.replace(tmp_path, display_name)
+        return output
     finally:
         os.remove(tmp_path)
